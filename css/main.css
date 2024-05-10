@@ -1,0 +1,127 @@
+@font-face {
+  font-family: Sono;
+  src: url('/fonts/Sono-Light.ttf') format(truetype);
+}
+@font-face {
+  font-family: Sono;
+  src: url('/fonts/Sono-Medium.ttf') format(truetype);
+  font-weight: bold;
+}
+
+html {
+  font-size: 14px;
+  --white: #d5e1e1;
+  --black: #252525;
+  --page-color: var(--white);
+  --text-color: var(--black);
+
+  --green:#2d9651;
+  --blue:#0078d7;
+  --lilac:#ce9fb7;
+  --yellow:#f0c93e;
+  --red:#fe5a13;
+  --cream:#f8e9b1;
+  --pink:#fa65b7;
+  --mid-tone: #aaaa;
+
+
+  --gray: #cbcbcb;
+  --green: #12A720;
+/*  --pink: #ed58df;*/
+/*  --blue: #0000ff;*/
+/*  --red: #ff6d38;*/
+/*  --yellow: #ffff00;*/
+
+
+ 
+}
+
+* { 
+  box-sizing: border-box;
+  font-size: 1em;
+  padding: 0;
+  margin: 0;
+}
+::-moz-selection {
+  background: var(--pink);
+}
+::selection {
+  background: var(--pink);
+}
+
+body {
+  background: var(--page-color);
+  color: var(--text-color);
+  padding: 1.5rem;
+  background-size: 1rem;
+  background-image: url('/dot.svg');
+  background-position: top left;
+  font-family: Sono, system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  /*:root {
+    --page-color: var(--black);
+    --text-color: var(--white);
+    --blue: #006093;
+    --green:#005037;
+    --yellow: #ff9637;
+    --red: #df2230;
+    --pink: #7832b4;
+    --cream: #976c3b;
+    --gray: #7f7f7f;
+  }*/
+}
+
+
+a {
+  color: unset;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+
+header {
+  display: flex;
+  height: 2.5rem;
+  align-items: center;
+  background: var(--green);
+  margin: -1.5rem;
+  margin-bottom: 1rem;
+}
+header > * {
+  padding: 0 1rem;
+}
+
+p {
+  background: var(--page-color);
+  outline: 1px solid var(--mid-tone);
+  padding: 1rem;
+  max-width: 20rem;
+
+}
+
+.button {
+  cursor: pointer;
+  border: none;
+}
+
+.gray { background: var(--gray); }
+.green { background: var(--green); }
+.blue { background: var(--blue); }
+.lilac { background: var(--lilac); }
+.yellow { background: var(--yellow); }
+.red { background: var(--red); }
+.cream { background: var(--cream); }
+.pink { background: var(--pink); }
+
+
+.current {
+  font-weight: bold;
+}
+
+button {
+  font-family: Sono, system-ui, sans-serif;
+  border-radius: 0.25em;
+}
