@@ -13,7 +13,7 @@ const FADE_TYPES = {
     return a + (t * (b - a));
   },
   sincos: (a, b, t) => {
-    return a * Math.cos(t * this.halfpi) + b * Math.sin(t * this.halfpi)
+    return a * Math.cos(t * Math.PI * 0.5) + b * Math.sin(t * Math.PI * 0.5);
   },
 }
 

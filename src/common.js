@@ -28,8 +28,8 @@ export const SOFT_CLIP = new Float32Array(64).map((_, n) => {
   return y;
 });
 
-export const HARD_CLIP = new Float32Array(64).map((_, n) => {
-  return 2 * (n / 63) - 1;
+export const HARD_CLIP = new Float32Array(8).map((_, n) => {
+  return 2 * (n / 7) - 1;
 })
 
 export const MONO = {

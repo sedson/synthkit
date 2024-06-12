@@ -69,7 +69,8 @@ function onLoadWorklet(name) {
 }
 
 /**
- * 
+ * Get a worklet by name and add a listenet to the callback queue if the 
+ * listener is not yet loaded.
  */
 function getWorklet(name, fn) {
   // Case (1) unknown worklet.
@@ -83,6 +84,6 @@ function getWorklet(name, fn) {
     fn();
   }
 
-  // Case (3) push the callback into the stack for when complete.
+  // Case (3) push the callback into the list for when complete.
   WORKLETS[name].onLoadCallbacks.push(fn);
 }

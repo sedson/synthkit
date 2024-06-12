@@ -1,4 +1,5 @@
-import * as pkg from '/src/synthkit.js';
+import { SynthKit, sk } from '/src/synthkit.js';
+
 // import * as SK from '/dist/synthkit.js';
 
 /** Query a css color from the page */
@@ -9,8 +10,8 @@ const getCol = col => {
 const bg = getCol("text");
 const fg = getCol("green");
 
-const SK = window.SK = pkg.sk;
-const kit = new pkg.SynthKit();
+const SK = window.SK = sk;
+const kit = new SynthKit();
 window.kit = kit;
 
 const lerp = (a, b, t) => a + t * (b - a);
@@ -161,6 +162,8 @@ window.addEventListener('keydown', e => {
     osc.feedback.value = lerp(-8, 8, val);
   });
 
+
+
   osc.listen('init', () => {
     let src1 = kit.randomSource(16, 2);
     let src2 = kit.randomSource(16, 2);
@@ -242,7 +245,7 @@ window.addEventListener('keydown', e => {
 }
 
 {
-  let mod = makeModule('Evelope', 'blue');
+  let mod = makeModule('Envelope', 'blue');
   const gain = kit.gain(0);
   const sig = kit.signal(1);
 
@@ -283,32 +286,62 @@ window.addEventListener('keydown', e => {
   sig.connect(gain).connect(scope);
 }
 
+
+
+{
+  let mod = makeModule('VCA', 'green');
+  let vca = kit.gain(0);
+  let osc = kit.oscillator({ shape: 'sinw', freq: 220 });
+  let env = kit.asr([0.01, 1.0, 2.5]);
+
+  osc.connect(vca);
+  env.connect(vca.gain);
+
+  vca.connect(kit.dac);
+
+  mod.btn('PLAY', () => {
+    env.gate(0, 0.02);
+  });
+
+  const scope = new SK.Scope(kit.ctx, mod.module, {
+    color: getCol('green'),
+    background: bg,
+    mode: 'points',
+    pointSize: 1,
+    samples: 2 ** 8,
+  });
+  vca.connect(scope);
+}
+
+
 {
   let mod = makeModule('Verb 3', 'yellow');
   let osc;
-  let noise = false;
 
+  let noise = false;
   if (noise) {
     osc = new SK.Noise(kit.ctx)
   } else {
-    osc = kit.oscillator({ frequency: 800, shape: 'sine' });
+    osc = new SK.FeedbackOscillator(kit.ctx, { frequency: 800, shape: 'tri' });
+    osc.listen('init', () => {
+      osc.feedback.value = 0.7;
+    })
   }
 
-  osc.gain.value = 0;
-  const env = kit.adsr(osc.gain, [0.01, 0.04, 0.6, 0.05]);
 
-  // console.log(osc)
-
-
+  const env = kit.asr([0.01, 1.0, 0.1]);
+  const vca = kit.vca(osc, env);
 
   const verb = new SK.Verb3(kit.ctx);
-  osc.connect(verb).connect(kit.dac);
+  vca.connect(verb).connect(kit.dac);
+
+  let getInfo;
 
   const cols = [
-    getCol("yellow"),
-    getCol("yellow"),
-    getCol("yellow"),
-    getCol("yellow"),
+    getCol("red"),
+    getCol("green"),
+    getCol("blue"),
+    getCol("pink"),
   ];
   verb.listen('init', () => {
     console.log('Verb3 on init');
@@ -318,26 +351,28 @@ window.addEventListener('keydown', e => {
         color: cols[i],
         mono: true,
         height: 80,
+        samples: 2 ** 12,
       });
       verb._decayNodes[i].connect(scp.inlet);
     }
-    // let scpL = new SK.Scope(kit.ctx, mod.module, {
-    //   color: [1, 0, 1],
-    //   mono: true,
-    // });
-    // let scpR = new SK.Scope(kit.ctx, mod.module, {
-    //   color: [0, 1, 1],
-    //   mono: true,
-    // });
+
+    getInfo = () => {
+      info.innerText = `THETA: ${rtod(verb.theta.value).toFixed(2)}, IOTA: ${rtod(verb.iota.value).toFixed(2)}`;
+    }
+    getInfo();
+    mod.module.append(info);
 
   });
+
+
 
   const scale = [60, 64, 72, 67, 71, 48];
   mod.btn('ON', () => {
     if (!noise) {
       osc.frequency.value = SK.mtof(scale[Math.floor(Math.random() * scale.length)]);
     }
-    env.triggerAttackRelease();
+    console.log(env)
+    env.gate(0, 0.05);
   });
   mod.slider('Mix', (val) => {
     verb.mix.value = val;
@@ -346,14 +381,22 @@ window.addEventListener('keydown', e => {
   //   verb.highcut.value = lerp(400, 10000, val);
   // });
   mod.slider('feedback', (val) => {
-    verb.feedback.value = Math.min(val * 1.4, 1.4);
+    verb.feedback.value = Math.min(val * 1, 1.01);
   });
   mod.slider('theta', (val) => {
-    verb.theta.value = val * 2 * Math.PI;
+    verb.theta.value = val * 0.5 * Math.PI;
+    getInfo();
   });
   mod.slider('iota', (val) => {
-    verb.iota.value = val * 2 * Math.PI;
+    verb.iota.value = val * 0.5 * Math.PI;
+    getInfo();
   });
+
+
+  const rtod = r => r * 180 / Math.PI;
+  let info = document.createElement('p');
+
+
 }
 
 
@@ -367,28 +410,34 @@ window.addEventListener('keydown', e => {
     noise.disconnect();
     filt.disconnect();
   }
+
   mod.btn('NO FILT', () => {
     disconnect();
     noise.connect(kit.dac)
   });
+
   mod.btn('LP', () => {
     disconnect();
     noise.connect(filt);
     filt.lowpass.connect(kit.dac);
   });
+
   mod.btn('BP', () => {
     disconnect();
     noise.connect(filt);
     filt.bandpass.connect(kit.dac);
   });
+
   mod.btn('HP', () => {
     disconnect();
     noise.connect(filt);
     filt.highpass.connect(kit.dac);
   });
+
   mod.btn('■', () => {
     disconnect();
   });
+
   mod.slider('CUTOFF', (val) => {
     filt.frequency.value = val * 11_000;
   })

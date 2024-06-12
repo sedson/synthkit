@@ -23,6 +23,13 @@
  * [ 131, 147, 201, 213 ]
  */
 
+// const DELAYS = [33 * 10, 33 * 10, 52 * 13 * 10, 52 * 13 * 10];
+// const DELAYS = [100, 2000, 100, 100];
+const DELAYS = [29, 37, 69, 53];
+const AP_FREQS = [500, 500, 500, 500];
+
+
+
 import { Effect } from './Effect.js';
 import { Gain } from '../utils/Gain.js';
 import { Delay } from '../utils/Delay.js';
@@ -33,12 +40,13 @@ import { StereoSplitter } from '../utils/StereoSplitter.js';
 import { StereoMerger } from '../utils/StereoMerger.js';
 import { MonoToStereo } from '../utils/MonoToStereo.js';
 import { Filter2 } from '../filters/Filter2.js';
+import { Filter } from '../filters/Filter.js';
+
 import { OnePoleFilter } from '../filters/OnePoleFilter.js';
 import { series } from '../common.js';
 
 
 const HIGHCUT = 16_000;
-
 
 
 export class Verb3 extends Effect {
@@ -53,23 +61,26 @@ export class Verb3 extends Effect {
     this._chainIn.connect(splitter.inlet);
 
 
+    const flip = new GainNode(this.ctx, { gain: -1 });
+
     this._mixer = this.createWorklet('mix-4', {
       numberOfInputs: 4,
       numberOfOutputs: 4,
       outputChannelCount: [1, 1, 1, 1],
     });
+
     this._theta = this._mixer.parameters.get('theta');
     this._iota = this._mixer.parameters.get('iota');
 
     this._delayLines = [
-      this.createChannelDelayLine(HIGHCUT, 29 / 1000),
-      this.createChannelDelayLine(HIGHCUT, 37 / 1000),
-      this.createChannelDelayLine(HIGHCUT, 68 / 1000),
-      this.createChannelDelayLine(HIGHCUT, 97 / 1000),
+      this.createChannelDelayLine(HIGHCUT, DELAYS[0] / 1000, AP_FREQS[0]),
+      this.createChannelDelayLine(HIGHCUT, DELAYS[1] / 1000, AP_FREQS[1]),
+      this.createChannelDelayLine(HIGHCUT, DELAYS[2] / 1000, AP_FREQS[2]),
+      this.createChannelDelayLine(HIGHCUT, DELAYS[3] / 1000, AP_FREQS[3]),
     ];
 
     splitter.L.connect(this._delayLines[0].in.inlet);
-    splitter.R.connect(this._delayLines[0].in.inlet);
+    splitter.R.connect(flip).connect(this._delayLines[1].in.inlet);
 
     this._decayParam = new Signal(this.ctx, 0);
 
@@ -80,7 +91,7 @@ export class Verb3 extends Effect {
       const decayNode = new GainNode(this.ctx, { gain: 0, channelCount: 1 });
 
       // delay line -> unitary mix matrix.
-      this._delayLines[i].saturator.outlet.connect(this._mixer, 0, i);
+      this._delayLines[i].last.outlet.connect(this._mixer, 0, i);
 
       // unitary mix matrix -> decay multiplier
       this._mixer.connect(decayNode, i, 0);
@@ -95,9 +106,9 @@ export class Verb3 extends Effect {
     const sumR = new GainNode(this.ctx, { gain: 0.5, channelCount: 1 });
 
     this._decayNodes[0].connect(sumL);
-    this._decayNodes[1].connect(sumL);
+    this._decayNodes[2].connect(sumL);
 
-    this._decayNodes[2].connect(sumR);
+    this._decayNodes[1].connect(sumR);
     this._decayNodes[3].connect(sumR);
 
     this._decayNodes[0].connect(this._delayLines[0].in.inlet);
@@ -120,24 +131,28 @@ export class Verb3 extends Effect {
 
 
 
-  createChannelDelayLine(highcut, delay) {
+  createChannelDelayLine(highcut, delay, ap) {
+    console.log('create delay line')
     const chain = [
       new Gain(this.ctx, 1, { mono: true }),
       new OnePoleFilter(this.ctx, { frequency: highcut, mono: true }),
+      new Filter(this.ctx, { type: 'allpass', freq: ap, q: 10 }),
       new Delay(this.ctx, delay, { mono: true }),
-      new Saturator(this.ctx, { mono: true }),
+
+      // new Saturator(this.ctx, { mono: true }),
     ];
     series(chain);
 
     const lfo = new Oscillator(this.ctx, { frequency: Math.random() * 0.1 });
     lfo.scale(10 / 10000);
-    lfo.connect(chain[2].delay);
+    // lfo.connect(chain[2].delay);
 
 
     return {
       in: chain[0],
       delay: chain[2],
-      saturator: chain[3],
+      last: chain[chain.length - 1]
+      // saturator: chain[3],
     };
   }
 }

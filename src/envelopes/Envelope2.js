@@ -41,6 +41,10 @@ export class Envelope2 extends Operator {
     this._shapeParam = this._env.parameters.get('shape');
 
 
+    this._attackParam.value = this._attack;
+    this._decayParam.value = this._decay;
+    this._sustainParam.value = this._sustain;
+    this._releaseParam.value = this._release;
 
     this._env.connect(this._out);
 
@@ -50,6 +54,7 @@ export class Envelope2 extends Operator {
   get outlet() { return this._out; }
 
   gate(startTime = 0, length = 0) {
+    if (!this._gateParam) {}
     const now = this.ctx.currentTime;
     let l = Math.max(1 / this.ctx.sampleRate, length);
     this._gateParam.setValueAtTime(1, now + startTime);

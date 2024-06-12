@@ -236,6 +236,7 @@ class Operator {
     worklet.addEventListener('processorerror', (e) => {
       console.error('There was an error!', e);
     });
+    worklet.port.onmessage = e => console.log(e.data);
     return worklet;
   }
 }
@@ -373,13 +374,11 @@ class Crossfade extends Operator {
     this.loadWorklet('crossfade');
   }
 
-
   init() {
     this._fader = this.createWorklet('crossfade', {
       numberOfInputs: 2,
       numberOfOutputs: 1,
     });
-
     this._mixParam = this._fader.parameters.get('mix');
     this._mix.connect(this._mixParam);
     this._a.connect(this._fader, 0, 0);
@@ -516,6 +515,10 @@ const SOFT_CLIP = new Float32Array(64).map((_, n) => {
   return y;
 });
 
+const HARD_CLIP = new Float32Array(64).map((_, n) => {
+  return 2 * (n / 63) - 1;
+});
+
 const MONO = {
   channelCount: 1,
   channelInterpretation: 'discrete',
@@ -644,7 +647,7 @@ class Saturator extends Operator {
     this._shaper = new WaveShaperNode(ctx, {
       ...this.channelSettings,
       oversample: '2x',
-      curve: SOFT_CLIP
+      curve: HARD_CLIP
     });
   }
   get inlet() { return this._shaper; }
@@ -1120,13 +1123,8 @@ class Verb3 extends Effect {
       this.createChannelDelayLine(HIGHCUT, 97 / 1000),
     ];
 
-    console.log(this._delayLines);
-
-
     splitter.L.connect(this._delayLines[0].in.inlet);
     splitter.R.connect(this._delayLines[0].in.inlet);
-
-    // return;
 
     this._decayParam = new Signal(this.ctx, 0);
 
@@ -1790,7 +1788,6 @@ class Spect extends Operator {
  * visualizers on top of.
  */
 
-
 /**
  * Default vertex shader.
  */
@@ -1815,7 +1812,6 @@ void main ()
 }
 `.trim();
 
-
 /**
  * Default fragment shader.
  */
@@ -1834,12 +1830,14 @@ uniform int uMode;
 
 void main () 
 { 
-  float fade = 0.5;
   if (uMode < 1) {
-   fade = 0.2 * smoothstep(0.5, 0.45, distance(vec2(0.5, 0.5), gl_PointCoord));
+   float fade = distance(vec2(0.5, 0.5), gl_PointCoord);
+   if (fade > 0.5) {
+    // discard;
+   }
   }
   
-  fragColor.rgb = uColor * (fade);
+  fragColor.rgb = uColor.rgb;
   fragColor.a = 1.0;
 }
 `.trim();
@@ -1936,9 +1934,11 @@ class Scope extends Operator {
      */
     this.samples = options.samples || 512;
 
+
     // Create an analyser node.
     this._analyser = new AnalyserNode(ctx, {
       fftSize: this.samples,
+      smoothingTimeConstant: 1,
       ...this.channelSettings
     });
 
@@ -1962,7 +1962,7 @@ class Scope extends Operator {
     this.gl = this._renderer.gl;
 
     this.gl.enable(this.gl.BLEND);
-    this.gl.blendFunc(this.gl.ONE, this.gl.ONE);
+    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
 
     // Store a gl buffer for each axis.
     this._graphicsBufferX = this.gl.createBuffer();
@@ -1988,7 +1988,7 @@ class Scope extends Operator {
 
     this.mode = options.mode || 'points';
 
-    this.pointSize = 4;
+    this.pointSize = options.pointSize || 4;
 
     this.color = this._renderer.hexToNormalizedRGB(options.color || '#fff');
     this.background = this._renderer.hexToNormalizedRGB(options.background || '#000');
@@ -2023,7 +2023,6 @@ class Scope extends Operator {
     }
     n - this.now;
     this.now = n;
-
 
     // if (elapsed > 17) { return; }
 
@@ -2124,7 +2123,7 @@ class Scope2D extends Operator {
 
     this.mode = options.mode || 'line';
 
-    this.pointSize = 4;
+    this.pointSize = options.pointSize || 4;
 
     this.color = this._renderer.hexToNormalizedRGB(options.color || '#fff');
     this.background = this._renderer.hexToNormalizedRGB(options.background || '#000');
@@ -2197,7 +2196,6 @@ class Scope2D extends Operator {
 }
 
 const lerp = (a, b, t) => a + (t * (b - a));
-const easeInExpo = (t) => t === 0 ? 0 : Math.pow(2, 10 * (t - 10));
 
 
 
@@ -2219,7 +2217,7 @@ class ADSREnvelope {
     this._sustain = ADSR[2];
     this._release = ADSR[3];
 
-    this._resolution = 0.002;
+    this._resolution = 0.1;
 
     this._attackDecayRamp = null;
     this._releaseRamp = null;
@@ -2236,12 +2234,11 @@ class ADSREnvelope {
   }
 
   _calculateRamps() {
-    const attackRamp = this.generateRamp(this._start, this._peak, this._attack);
-    const decayRamp = this.generateRamp(this._peak, this._sustain, this._decay);
+    const attackRamp = this.generateRamp(this._start, this._peak, this._attack, true);
+    const decayRamp = this.generateRamp(this._peak, this._sustain, this._decay, true);
     this._attackDecayRamp = Float32Concat(attackRamp, decayRamp);
-    this._releaseRamp = this.generateRamp(this._sustain, this._start, this._release);
+    this._releaseRamp = this.generateRamp(this._sustain, this._start, this._release, true);
     this._attackDecayReleaseRamp = Float32Concat(this._attackDecayRamp, this._releaseRamp);
-
   }
 
   set attack(val) {
@@ -2285,7 +2282,7 @@ class ADSREnvelope {
     this.param.setValueAtTime(this._start, now);
 
     try {
-      this.param.setValueCurveAtTime(this._attackDecayRamp, now, rampTime);
+      this.param.setValueCurveAtTime(this._attackDecayRamp, now + 1 / this.ctx.sampleRate, rampTime);
     } catch {
 
     }
@@ -2309,9 +2306,11 @@ class ADSREnvelope {
     if (now < this._rampDone) return;
     const rampTime = this._attack + this._decay + this._release;
     this._rampDone = now + rampTime;
+    this.param.setValueAtTime(this._start, now);
+    // console.log(128 / this.ctx.sampleRate)
 
     try {
-      this.param.setValueCurveAtTime(this._attackDecayReleaseRamp, now, rampTime);
+      this.param.setValueCurveAtTime(this._attackDecayReleaseRamp, now + 128 / this.ctx.sampleRate, rampTime);
     } catch {
 
     }
@@ -2324,16 +2323,88 @@ class ADSREnvelope {
     samples = Math.max(samples, 3);
     const ramp = new Float32Array(samples);
     for (let i = 0; i < samples; i++) {
+      let t = i / (samples - 1);
       if (expo) {
-        ramp[i] = lerp(from, to, easeInExpo(i / (samples)));
+        ramp[i] = lerp(from, to, 1 - ((1 - t) ** 2));
       } else {
-        ramp[i] = lerp(from, to, i / (samples - 1));
+        ramp[i] = lerp(from, to, t);
       }
     }
     return ramp;
   }
 
 
+}
+
+class Envelope2 extends Operator {
+  constructor(ctx, options) {
+    super(ctx);
+
+    this._attack = options.attack || 0.01;
+    this._decay = options.decay || 0.1;
+    this._sustain = options.sustain || 0.5;
+    this._release = options.release || 0.1;
+    this._shape = options.shape || 0.01;
+
+    this.type = (options.type || 'adsr').toUpperCase();
+
+
+    // this._source = new ConstantSourceNode(ctx, {
+    //   offset: 0,
+    // });
+    // this._source.start();
+
+    this.loadWorklet('envelope-generator');
+
+    this._out = new GainNode(this.ctx, { ...MONO, gain: 1 });
+  }
+
+  init() {
+    this._env = this.createWorklet('envelope-generator', {
+      numberOfInputs: 0,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+      processorOptions: { type: this.type },
+    });
+
+    this._gateParam = this._env.parameters.get('gate');
+    this._attackParam = this._env.parameters.get('attack');
+    this._releaseParam = this._env.parameters.get('release');
+    this._decayParam = this._env.parameters.get('decay');
+    this._sustainParam = this._env.parameters.get('sustain');
+    this._shapeParam = this._env.parameters.get('shape');
+
+
+
+    this._env.connect(this._out);
+
+  }
+
+  get inlet() { return null; }
+  get outlet() { return this._out; }
+
+  gate(startTime = 0, length = 0) {
+    const now = this.ctx.currentTime;
+    let l = Math.max(1 / this.ctx.sampleRate, length);
+    this._gateParam.setValueAtTime(1, now + startTime);
+    this._gateParam.setValueAtTime(0, now + startTime + l);
+  }
+
+  gateOn(time = 0) {
+
+  }
+
+  gateOff(time = 0) {
+
+  }
+
+  // gate(time = 0.1) {
+  //   const now = this.ctx.currentTime;
+  //   this._source.offset.setValueAtTime(0, now);
+  //   this._source.offset.linearRampToValueAtTime(1, now + 0.03);
+  //   this._source.offset.linearRampToValueAtTime(0, now + 0.0301 + 0.03);
+  //   // this._source.offset.setValueAtTime(0, now + 0.0301 + 0.5)
+  // }
 }
 
 var map = /*#__PURE__*/Object.freeze({
@@ -2345,11 +2416,13 @@ var map = /*#__PURE__*/Object.freeze({
   Crossfade: Crossfade,
   Delay: Delay,
   Distortion: Distortion,
+  Envelope2: Envelope2,
   FILTER_TYPES: FILTER_TYPES,
   FeedbackOscillator: FeedbackOscillator,
   Filter: Filter,
   Filter2: Filter2,
   Gain: Gain,
+  HARD_CLIP: HARD_CLIP,
   IR: IR,
   IR_EXPO: IR_EXPO,
   MONO: MONO,
@@ -2402,6 +2475,9 @@ const worklets = [{
 }, {
   name: 'state-variable-filter',
   path: '/src/worklets/StateVariableFilter.processor.js',
+}, {
+  name: 'envelope-generator',
+  path: '/src/worklets/EnvelopeGenerator.processor.js'
 }];
 
 /**
@@ -2421,7 +2497,6 @@ const WORKLETS = {};
  * worklets.
  */
 function setupWorkletContext(ctx, bundlePath) {
-  console.log(bundlePath);
 
   if (ctx.sk_getWorklet) {
     console.warn('Synthkit worklets already set up in context.');
@@ -2436,7 +2511,6 @@ function setupWorkletContext(ctx, bundlePath) {
   }
 
   if (bundlePath) {
-    console.log(bundlePath, 'GOOD');
     ctx.audioWorklet.addModule(bundlePath).then(() => {
       for (let name in WORKLETS) {
         onLoadWorklet(name);
@@ -2476,10 +2550,10 @@ function onLoadWorklet(name) {
 }
 
 /**
- * 
+ * Get a worklet by name and add a listenet to the callback queue if the 
+ * listener is not yet loaded.
  */
 function getWorklet(name, fn) {
-  console.log(name, WORKLETS);
   // Case (1) unknown worklet.
   if (!WORKLETS[name]) {
     console.error('Unknown worklet processor name: ', name);
@@ -2491,7 +2565,7 @@ function getWorklet(name, fn) {
     fn();
   }
 
-  // Case (3) push the callback into the stack for when complete.
+  // Case (3) push the callback into the list for when complete.
   WORKLETS[name].onLoadCallbacks.push(fn);
 }
 

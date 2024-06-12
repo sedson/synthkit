@@ -40,6 +40,10 @@ class Mix4 extends BaseWorklet {
       const c = this.sample(inputs[2][0], s) ?? 0;
       const d = this.sample(inputs[3][0], s) ?? 0;
 
+      // In the reverb case: 
+      // a and b have input signa.
+      // a2 and c1 have dry output signal if both coeffs are 0.
+
       const a1 = (a * cosTheta) - (b * sinTheta);
       const b1 = (a * sinTheta) + (b * cosTheta);
 
@@ -52,10 +56,13 @@ class Mix4 extends BaseWorklet {
       const c2 = (b1 * cosIota) - (d1 * sinIota);
       const d2 = (b1 * sinIota) + (d1 * cosIota);
 
-      outputs[0][0][s] = a2;
-      outputs[1][0][s] = b2;
-      outputs[2][0][s] = c2;
-      outputs[3][0][s] = d2;
+      // const norm = Math.sqrt(a2 * a2 + b2 * b2 + c2 * c2 + d2 * d2);
+      const norm = 1;
+
+      outputs[0][0][s] = a2 / norm;
+      outputs[1][0][s] = b2 / norm;
+      outputs[2][0][s] = c2 / norm;
+      outputs[3][0][s] = d2 / norm;
     }
     return true;
   }

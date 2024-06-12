@@ -50,11 +50,43 @@ export class SynthKit {
     return new sk.Gain(this.ctx, val);
   }
 
+  /**
+   * Make a VCA.
+   * @param {Operator} signal the input signal
+   * @param {Opearator} voltage the control voltage – likely an envelope.
+   * @returns {Gain} A gain node the multiplies the the signal and voltage.
+   */
+  vca(signal, voltage) {
+    const g = new sk.Gain(this.ctx, 0);
+    signal.connect(g);
+    voltage.connect(g.gain);
+    return g;
+  }
+
   randomSource(steps, length) {
     return new sk.RandomSource(this.ctx, steps, length);
   }
 
-  adsr(param, adsr) {
-    return new sk.ADSREnvelope(this.ctx, param, adsr);
+  adsr(adsr) {
+    const [attack, decay, sustain, release] = adsr;
+    return new sk.Envelope2(this.ctx, {
+      type: 'ADSR',
+      attack,
+      decay,
+      sustain,
+      release
+    });
   }
+
+  asr(asr) {
+    const [attack, sustain, release] = asr;
+    return new sk.Envelope2(this.ctx, {
+      type: 'ASR',
+      attack,
+      sustain,
+      release
+    });
+  }
+
+
 }

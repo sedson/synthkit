@@ -18,7 +18,7 @@ class FeedbackOscillator extends BaseWorklet {
       delta: 0
     };
 
-    // Singe sample feedback buffer.
+    // Single sample feedback buffer.
     this.lastSample = 0;
   }
 
@@ -31,14 +31,14 @@ class FeedbackOscillator extends BaseWorklet {
         maxValue: sampleRate * 0.5,
         defaultValue: 440,
         automationRate: 'a-rate',
-      }, 
+      },
       {
         name: 'feedback',
         minValue: -4,
         maxValue: 4,
         defaultValue: 0,
         automationRate: 'a-rate',
-      }, 
+      },
     ];
   }
 

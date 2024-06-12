@@ -18,6 +18,7 @@ export class Saturator extends Operator {
       oversample: '2x',
       curve: HARD_CLIP
     });
+    console.log({ HARD_CLIP })
   }
   get inlet() { return this._shaper; }
   get outlet() { return this._shaper; }
